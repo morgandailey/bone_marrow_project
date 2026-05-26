@@ -166,8 +166,8 @@ def process_wsi(wsi_path: str, ckpt_path: str, output_dir: str,
             n_kept = 0
             for (cls_name, conf, top3), cell_meta, crop_pil in zip(preds, meta, crops):
                 if cls_name in TARGET_CLS and conf >= conf_thresh:
-                    idx   = counters[cls_name]
-                    fname = f'{idx:06d}.jpg'
+                    wsi_stem = os.path.splitext(os.path.basename(wsi_path))[0]
+                    fname = f'{wsi_stem}_x{cell_meta["x"]}_y{cell_meta["y"]}.jpg'
                     save_path = os.path.join(crops_root, cls_name, fname)
                     crop_pil.save(save_path, quality=95)
                     candidates.append({

@@ -238,7 +238,12 @@ project1/
 - 加上 WSI domain shift（MLL 上 F1=0.862 → WSI 上 0.456）
 - 改善方向：①確認 144 張標注品質（BLA/PMO 邊界案例請醫師重審）②增加到 ~300 張③長期加入 context window
 
-### 3. 某些 Cell 需要上下文
+### 3. wsi_crops/ 圖片命名混用，重複偵測只能靠 hash
+- 舊圖（手選自 wsi_scan）是流水號命名，無法對應回座標；新版腳本已改為 `{wsi}_x{x}_y{y}.jpg`
+- 每次加新圖後必須跑 `python cell_cls/data/dedup_crops.py` 做 MD5 hash 比對
+- 根本解無法實施：38 張 MON、17 張 BAS 是手選的，沒有 annotation JSON，刪掉找不回來
+
+### 4. 某些 Cell 需要上下文
 - 早期 EBO vs LYT：裁切圖幾乎一樣
 - MON vs MMZ：大小是主要差異，裁切圖看不出
 - 平台的縮放功能部分解決此問題
