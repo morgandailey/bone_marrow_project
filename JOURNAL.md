@@ -308,6 +308,39 @@ EfficientNetV2-M 分兩段：
 
 ---
 
+## 2026-05-26
+
+### 今天做了什麼
+
+- 版本控制整理：
+  - 發現 git history 累積 2.57GB（yolo_det/sparsedet 大型檔案），push 失敗
+  - 用 orphan branch 方式重建乾淨 git history，成功推上 GitHub
+  - GitHub repo 更名：`blood_test_net` → `bone_marrow_project`
+  - 刪除舊 master branch，主線統一為 `master`
+  - 更新 `.gitignore`：新增 `cell_cls/wsi_crops/`、`cell_cls/runs/wsi_scan*/`、`archive/`
+
+- 目錄清理：
+  - 刪除 `tools/`（build_code_explorer.py、build_progress_report_ppt.py，已無使用需求）
+  - 刪除 `cell_cls/scripts/run_train_stage2.sh`（與 train_stage2.slurm 功能重複）
+  - `sparsedet/`、`yolo_det/` 移至 `archive/`
+
+- 資料品質防護：
+  - 發現 `wsi_crops/` 圖片有兩個來源（平台 annotation 裁切 vs WSI scan 手選），命名方式不同，無法靠檔名判斷重複
+  - 新增 `cell_cls/data/dedup_crops.py`：MD5 hash 比對，掃描重複圖片
+  - `crop_wsi_cells.py` 和 `wsi_detect_classify.py` 改為座標命名（`{wsi}_x{x}_y{y}.jpg`）
+  - 確認現有 wsi_crops/ 無重複（dry run 通過）
+
+- 更新 `requirements.txt`：補上實際版本號（timm、cellpose、opencv、pandas 等）
+- 更新 README：目錄結構、套件清單、已知問題（命名混用）
+
+### 明天從哪接著做
+
+- [ ] 了解 `cell_cls/core/`、`data/`、`eval/` 各檔案用途
+- [ ] 決定是否清除 `runs/archive/`、`runs/wsi_scan/`、`runs/wsi_scan_conf05/`
+- [ ] 用 stage2_v3 重跑 WSI scan
+
+---
+
 ## cell_cls/ 檔案說明
 
 | 檔案 | 用途 |
