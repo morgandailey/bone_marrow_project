@@ -1,0 +1,51 @@
+# WSI 原始檔
+*.mrxs
+*.svs
+*.ndpi
+*.tiff
+*.tif
+Data0001.dat
+
+# 資料夾（圖片、label、inference 結果）
+data/
+0000201584/
+slide-2025-10-01T13-44-33-R1-S23/
+
+# 模型權重
+*.pt
+*.pth
+*.onnx
+
+# 訓練輸出
+cell_cls/logs/
+cell_detection/runs/
+cell_detection0/runs/
+cell_detection2/runs/
+cell_detection/visualize_output/
+
+# cell_cls 訓練圖片與推論輸出（大量圖片，不追蹤）
+cell_cls/wsi_crops/
+cell_cls/runs/wsi_scan*/
+
+# 封存的舊專案（大型資料夾）
+archive/
+
+# 推論 & 訓練產出的 artifact（圖片、label、cache）
+cell_detection/inference/
+cell_detection/train/
+cell_detection/val/
+cell_detection0/inference/
+cell_detection/logs/
+cell_detection0/logs/
+*.cache
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# 編輯器
+.vscode/
+.idea/

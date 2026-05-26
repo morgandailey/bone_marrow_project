@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>骨髓 WSI 細胞分析 — Alovas Prototype</title>
+<style>
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #1a1c20; color: #e8e8e8; height: 100vh; overflow: hidden; }
+button { cursor: pointer; font-family: inherit; }
+
+/* ══════════════════════════════════════════
+   PAGE 1 — WSI VIEWER
+══════════════════════════════════════════ */
+#page-wsi {
+  display: flex; flex-direction: column; height: 100vh;
+}
+
+/* top bar */
+.topbar {
+  background: #111317; border-bottom: 1px solid #2a2d35;
+  padding: 10px 20px; display: flex; align-items: center; gap: 14px;
+  flex-shrink: 0;
+}
+.topbar .alovas-logo {
+  background: #1565c0; color: #fff; font-size: 11px; font-weight: 800;
+  padding: 4px 10px; border-radius: 4px; letter-spacing: .5px;
+}
+.topbar .wsi-name { font-size: 14px; font-weight: 600; color: #ddd; }
+.topbar .wsi-meta { font-size: 11px; color: #666; }
+.topbar .spacer { flex: 1; }
+.btn-analyze {
+  background: #1565c0; color: #fff; border: none;
+  padding: 9px 22px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+  transition: background .2s, transform .1s;
+}
+.btn-analyze:hover { background: #1976d2; }
+.btn-analyze:active { transform: scale(.97); }
+.btn-analyze .spinner { display: none; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+.btn-analyze.loading .spinner { display: block; }
+.btn-analyze.loading .btn-icon { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* wsi canvas area */
+.wsi-area {
+  flex: 1; position: relative; overflow: hidden; background: #0d0e10;
+  display: flex; align-items: center; justify-content: center;
+}
+#wsi-canvas { display: block; cursor: crosshair; }
+
+/* progress overlay */
+.progress-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,.65);
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  z-index: 10;
+}
+.progress-overlay.show { display: flex; }
+.progress-step { font-size: 14px; color: #90caf9; font-weight: 500; }
+.prog-bar-wrap { width: 320px; }
+.prog-bar-bg { height: 6px; background: #2a2d35; border-radius: 3px; overflow: hidden; }
+.prog-bar-fill { height: 100%; background: #1976d2; border-radius: 3px; transition: width .45s ease; width: 0; }
+.prog-pct { font-size: 12px; color: #555; text-align: right; margin-top: 4px; }
+
+/* wsi info bar */
+.wsi-infobar {
+  background: #111317; border-top: 1px solid #2a2d35;
+  padding: 7px 20px; display: flex; gap: 24px; font-size: 11px; color: #666;
+  flex-shrink: 0;
+}
+.wsi-infobar span { color: #aaa; font-weight: 500; }
+
+/* ══════════════════════════════════════════
+   PAGE 2 — REVIEW INTERFACE (Alovas-style)
+══════════════════════════════════════════ */
+#page-review {
+  display: none; flex-direction: column; height: 100vh;
+}
+#page-review.show { display: flex; }
+
+/* top bar */
+.rv-topbar {
+  background: #111317; border-bottom: 1px solid #2a2d35;
+  padding: 0 0 0 0; display: flex; align-items: stretch; flex-shrink: 0;
+}
+.rv-topbar .brand {
+  background: #1565c0; color: #fff; font-size: 12px; font-weight: 800;
+  padding: 0 16px; display: flex; align-items: center; letter-spacing: .5px; min-width: 90px;
+  justify-content: center;
+}
+/* class tabs */
+.class-tabs {
+  display: flex; align-items: stretch; overflow-x: auto; flex: 1;
+  scrollbar-width: none;
+}
+.class-tabs::-webkit-scrollbar { display: none; }
+.class-tab {
+  padding: 0 18px; font-size: 12px; font-weight: 600; color: #888;
+  border: none; background: transparent; border-bottom: 2px solid transparent;
+  white-space: nowrap; cursor: pointer; transition: color .15s, border-color .15s;
+  display: flex; align-items: center; gap: 6px; min-height: 44px;
+}
+.class-tab:hover { color: #ccc; }
+.class-tab.active { color: #90caf9; border-bottom-color: #1976d2; }
+.class-tab .alert-dot { width: 6px; height: 6px; background: #ef5350; border-radius: 50%; }
+
+/* right side of topbar */
+.rv-topbar-right {
+  display: flex; align-items: center; gap: 10px; padding: 0 16px;
+  border-left: 1px solid #2a2d35;
+}
+.btn-back {
+  background: transparent; border: 1px solid #3a3d45; color: #aaa;
+  padding: 5px 12px; border-radius: 5px; font-size: 12px;
+  transition: border-color .2s, color .2s;
+}
+.btn-back:hover { border-color: #90caf9; color: #90caf9; }
+
+/* status tabs */
+.status-tabs {
+  background: #16181e; border-bottom: 1px solid #2a2d35;
+  display: flex; align-items: center; gap: 4px; padding: 0 16px;
+  flex-shrink: 0; min-height: 40px;
+}
+.status-tab {
+  padding: 0 14px; height: 38px; font-size: 12px; font-weight: 500; color: #666;
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; display: flex; align-items: center; gap: 5px;
+  transition: color .15s;
+}
+.status-tab:hover { color: #ccc; }
+.status-tab.active { color: #e8e8e8; border-bottom-color: #e8e8e8; }
+.status-tab .count {
+  font-size: 11px; padding: 1px 6px; border-radius: 10px;
+  background: #2a2d35; color: #888;
+}
+.status-tab.active .count { background: #1565c0; color: #fff; }
+.status-tab.st-accepted .count { background: #1b5e20; color: #a5d6a7; }
+.status-tab.st-accepted { color: #a5d6a7; }
+.status-tab.st-rejected .count { background: #5c1a1a; color: #ef9a9a; }
+.status-tab.st-uncertain .count { background: #5d4037; color: #ffcc80; }
+
+/* main review area */
+.rv-body {
+  flex: 1; display: flex; overflow: hidden;
+}
+
+/* left: cell grid */
+.cell-grid-panel {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  border-right: 1px solid #2a2d35;
+}
+.cell-grid {
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  align-content: start;
+}
+.cell-grid::-webkit-scrollbar { width: 6px; }
+.cell-grid::-webkit-scrollbar-track { background: transparent; }
+.cell-grid::-webkit-scrollbar-thumb { background: #2a2d35; border-radius: 3px; }
+.cell-thumb {
+  aspect-ratio: 1; border-radius: 4px; overflow: hidden; cursor: pointer;
+  border: 2px solid transparent; transition: border-color .15s, transform .1s;
+  position: relative; background: #0d0e10;
+}
+.cell-thumb canvas { width: 100%; height: 100%; display: block; }
+.cell-thumb:hover { border-color: #4a4d55; transform: scale(1.04); }
+.cell-thumb.selected { border-color: #ef5350 !important; }
+.cell-thumb .conf-badge {
+  position: absolute; bottom: 3px; right: 3px;
+  font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px;
+}
+
+/* pagination */
+.pagination {
+  padding: 10px 12px; display: flex; align-items: center; gap: 4px;
+  border-top: 1px solid #2a2d35; justify-content: center; flex-shrink: 0;
+}
+.pg-btn {
+  width: 28px; height: 28px; border-radius: 4px; background: transparent;
+  border: 1px solid #2a2d35; color: #888; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: border-color .15s, color .15s;
+}
+.pg-btn:hover { border-color: #4a4d55; color: #ddd; }
+.pg-btn.active { background: #1565c0; border-color: #1565c0; color: #fff; }
+
+/* right: detail panel */
+.detail-panel {
+  width: 320px; min-width: 320px; display: flex; flex-direction: column;
+  background: #13151a;
+}
+.detail-context {
+  flex: 1; position: relative; overflow: hidden; display: flex;
+  align-items: center; justify-content: center; background: #0d0e10;
+}
+#detail-ctx-canvas { display: block; max-width: 100%; max-height: 100%; }
+.detail-cell-box {
+  position: absolute; border: 2px solid #ef5350;
+  pointer-events: none;
+}
+
+.detail-info {
+  padding: 14px 16px; flex-shrink: 0; border-top: 1px solid #2a2d35;
+}
+.suggestion-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+.suggestion-value { font-size: 17px; font-weight: 700; color: #e8e8e8; margin-bottom: 10px; }
+.conf-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.conf-row label { font-size: 11px; color: #666; }
+.conf-bar-bg { flex: 1; height: 7px; background: #2a2d35; border-radius: 4px; overflow: hidden; }
+.conf-bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+.conf-val { font-size: 12px; font-weight: 700; }
+
+/* top-3 dist */
+.top3 { margin-bottom: 14px; }
+.top3-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.top3-cls { font-size: 11px; color: #888; width: 36px; }
+.top3-bar-bg { flex: 1; height: 7px; background: #2a2d35; border-radius: 4px; overflow: hidden; }
+.top3-bar-fill { height: 100%; border-radius: 4px; }
+.top3-pct { font-size: 11px; color: #666; width: 32px; text-align: right; }
+
+.action-btns { display: flex; gap: 8px; }
+.btn-accept {
+  flex: 1; background: #1b5e20; color: #a5d6a7; border: none;
+  padding: 10px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  transition: background .2s;
+}
+.btn-accept:hover { background: #2e7d32; }
+.btn-reject {
+  flex: 1; background: #5c1a1a; color: #ef9a9a; border: none;
+  padding: 10px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  transition: background .2s;
+}
+.btn-reject:hover { background: #7b2020; }
+
+.empty-grid {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px; color: #3a3d45;
+}
+.empty-grid .icon { font-size: 40px; opacity: .4; }
+.empty-grid p { font-size: 13px; }
+
+/* ── Minimap ── */
+.minimap-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border-left: 1px solid #2a2d35; padding-left: 14px;
+}
+.minimap-label { font-size: 9px; color: #555; letter-spacing: .6px; text-transform: uppercase; }
+#minimap-canvas {
+  border-radius: 4px; border: 1px solid #2a2d35; display: block;
+  cursor: pointer; transition: border-color .2s;
+}
+#minimap-canvas:hover { border-color: #4a4d55; }
+
+/* ── Reject dropdown menu ── */
+.reject-wrap { position: relative; }
+.reject-menu {
+  position: absolute; bottom: calc(100% + 8px); right: 0; left: 0;
+  background: #1e2028; border: 1px solid #3a3d45; border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.6);
+  overflow: hidden; display: none; z-index: 100;
+}
+.reject-menu.show { display: block; }
+.rm-header {
+  font-size: 10px; color: #555; padding: 9px 14px 6px;
+  border-bottom: 1px solid #2a2d35; letter-spacing: .4px;
+}
+.rm-option {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px; cursor: pointer; background: transparent;
+  border: none; width: 100%; text-align: left; transition: background .15s;
+}
+.rm-option:hover { background: #252830; }
+.rm-option .rm-cls-dot { width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; flex-shrink: 0; }
+.rm-option .rm-cls-name { font-size: 12px; font-weight: 600; color: #ddd; flex: 1; }
+.rm-option .rm-pct { font-size: 11px; color: #666; }
+.rm-divider { height: 1px; background: #2a2d35; }
+.rm-direct {
+  display: block; width: 100%; padding: 9px 14px; text-align: left;
+  background: transparent; border: none; color: #888; font-size: 12px;
+  cursor: pointer; transition: background .15s;
+}
+.rm-direct:hover { background: #252830; color: #ef9a9a; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 28px; left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: #1565c0; color: #90caf9;
+  padding: 8px 18px; border-radius: 6px;
+  font-size: 12px; font-weight: 600; opacity: 0;
+  transition: opacity .25s, transform .25s;
+  pointer-events: none; z-index: 999; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     PAGE 1 — WSI VIEWER
+════════════════════════════════════════ -->
+<div id="page-wsi">
+  <div class="topbar">
+    <span class="alovas-logo">ALOVAS</span>
+    <div>
+      <div class="wsi-name">0000201584.mrxs</div>
+      <div class="wsi-meta">骨髓穿刺切片 · 2025-11-03 · 40×</div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn-analyze" id="btn-analyze" onclick="startAnalysis()">
+      <span class="btn-icon">🤖</span>
+      <div class="spinner"></div>
+      AI 自動分析
+    </button>
+  </div>
+
+  <div class="wsi-area">
+    <canvas id="wsi-canvas"></canvas>
+
+    <!-- progress overlay -->
+    <div class="progress-overlay" id="progress-overlay">
+      <div class="progress-step" id="prog-step">初始化…</div>
+      <div class="prog-bar-wrap">
+        <div class="prog-bar-bg"><div class="prog-bar-fill" id="prog-fill"></div></div>
+        <div class="prog-pct" id="prog-pct">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wsi-infobar">
+    掃描解析度：<span>0.25 µm/px @ 40×</span>
+    &nbsp;·&nbsp; 切片尺寸：<span>115,000 × 85,000 px</span>
+    &nbsp;·&nbsp; 組織覆蓋率：<span>62%</span>
+    &nbsp;·&nbsp; 狀態：<span id="wsi-status">等待分析</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     PAGE 2 — REVIEW INTERFACE
+════════════════════════════════════════ -->
+<div id="page-review">
+
+  <!-- top bar with class tabs -->
+  <div class="rv-topbar">
+    <div class="brand">ALOVAS</div>
+    <div class="class-tabs" id="class-tabs"></div>
+    <div class="rv-topbar-right">
+      <div class="minimap-wrap" title="點擊返回 WSI">
+        <div class="minimap-label">ROI 位置</div>
+        <canvas id="minimap-canvas" width="160" height="80" onclick="backToWSI()"></canvas>
+      </div>
+      <button class="btn-back" onclick="backToWSI()">← WSI</button>
+    </div>
+  </div>
+
+  <!-- status tabs -->
+  <div class="status-tabs" id="status-tabs"></div>
+
+  <!-- body -->
+  <div class="rv-body">
+    <!-- left: cell grid -->
+    <div class="cell-grid-panel">
+      <div class="cell-grid" id="cell-grid"></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- right: detail -->
+    <div class="detail-panel">
+      <div class="detail-context">
+        <canvas id="detail-ctx-canvas" width="320" height="240"></canvas>
+        <div class="detail-cell-box" id="detail-cell-box"></div>
+      </div>
+      <div class="detail-info">
+        <div class="suggestion-label">Suggestion</div>
+        <div class="suggestion-value" id="sug-value">—</div>
+        <div class="conf-row">
+          <label>信心度</label>
+          <div class="conf-bar-bg"><div class="conf-bar-fill" id="conf-bar"></div></div>
+          <span class="conf-val" id="conf-val-text">—</span>
+        </div>
+        <div class="top3" id="top3-dist"></div>
+        <div class="reject-wrap">
+          <div class="reject-menu" id="reject-menu">
+            <div class="rm-header">此細胞可能是：</div>
+            <div id="rm-options"></div>
+            <div class="rm-divider"></div>
+            <button class="rm-direct" onclick="confirmReject()">✕ 直接 Reject（不重新分類）</button>
+          </div>
+          <div class="action-btns">
+            <button class="btn-accept" onclick="setStatus('accepted')">✅ Accept</button>
+            <button class="btn-reject" id="btn-reject" onclick="toggleRejectMenu()">✕ Reject</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  MOCK DATA
+// ═══════════════════════════════════════════════
+
+// 5 ROI positions (normalized 0~1 relative to WSI canvas)
+const MOCK_ROIS = [
+  { x: .13, y: .18, w: .17, h: .28, color: '#ef5350' },
+  { x: .42, y: .10, w: .17, h: .28, color: '#42a5f5' },
+  { x: .65, y: .26, w: .17, h: .28, color: '#66bb6a' },
+  { x: .22, y: .58, w: .17, h: .28, color: '#ffa726' },
+  { x: .58, y: .56, w: .17, h: .28, color: '#ab47bc' },
+];
+
+const CLASS_INFO = {
+  NEU: { label: 'Neutrophil',      abbr: 'NEU', color: '#42a5f5', alert: false },
+  LYM: { label: 'Lymphocyte',      abbr: 'LYM', color: '#66bb6a', alert: false },
+  MON: { label: 'Monocyte',        abbr: 'MON', color: '#ffa726', alert: true  },
+  EOS: { label: 'Eosinophil',      abbr: 'EOS', color: '#ab47bc', alert: false },
+  BAS: { label: 'Basophil',        abbr: 'BAS', color: '#ef5350', alert: true  },
+  EBL: { label: 'Erythroblast',    abbr: 'EBL', color: '#26c6da', alert: false },
+  MMZ: { label: 'Metamyelocyte',   abbr: 'MMZ', color: '#8d6e63', alert: false },
+  BLA: { label: 'Blast',           abbr: 'BLA', color: '#ec407a', alert: true  },
+};
+
+// Generate mock cells for each class
+// conf drives initial status: >=0.85→accepted, 0.55~0.85→uncertain, <0.55→pending
+function makeCell(cls, conf, seed) {
+  const rng = seededRandom(seed);
+  // top-3 softmax-like distribution
+  const top = { [cls]: conf };
+  const others = Object.keys(CLASS_INFO).filter(k => k !== cls);
+  let rem = 1 - conf;
+  others.forEach((k, i) => {
+    const v = i < 2 ? rem * (0.4 + rng() * 0.3) : rem * (rng() * 0.15);
+    top[k] = Math.min(v, rem);
+    rem -= top[k];
+  });
+
+  let status;
+  if (conf >= 0.85) status = 'accepted';
+  else if (conf >= 0.55) status = 'uncertain';
+  else status = 'pending';
+
+  return { cls, conf, top, status, seed, roiId: Math.floor(Math.random() * 5) };
+}
+
+const MOCK_CELLS = {};
+const CLASS_COUNTS = { NEU: 38, LYM: 27, MON: 18, EOS: 14, BAS: 9, EBL: 16, MMZ: 22, BLA: 11 };
+let seedBase = 0;
+Object.entries(CLASS_COUNTS).forEach(([cls, n]) => {
+  MOCK_CELLS[cls] = [];
+  for (let i = 0; i < n; i++) {
+    // vary confidence: lots at high end for common classes, lower for rare
+    const rareBoost = (cls === 'BAS' || cls === 'MON' || cls === 'BLA') ? -0.15 : 0;
+    const conf = Math.max(0.35, Math.min(0.98, 0.5 + Math.random() * 0.45 + rareBoost));
+    MOCK_CELLS[cls].push(makeCell(cls, conf, seedBase++));
+  }
+  // sort by conf desc
+  MOCK_CELLS[cls].sort((a, b) => b.conf - a.conf);
+});
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let analysisComplete = false;
+let currentClass  = 'MMZ';
+let currentStatus = 'uncertain';
+let currentPage   = 1;
+let selectedIdx   = null;
+const PAGE_SIZE   = 15;
+
+// ═══════════════════════════════════════════════
+//  PAGE 1 — WSI CANVAS
+// ═══════════════════════════════════════════════
+function drawWSI() {
+  const canvas = document.getElementById('wsi-canvas');
+  const area   = canvas.parentElement;
+  canvas.width  = area.clientWidth;
+  canvas.height = area.clientHeight;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // dark bg
+  ctx.fillStyle = '#0d0e10';
+  ctx.fillRect(0, 0, W, H);
+
+  // tissue blob
+  const cx = W * 0.5, cy = H * 0.5;
+  const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.42);
+  grd.addColorStop(0,   '#d4b28a');
+  grd.addColorStop(0.4, '#c4a070');
+  grd.addColorStop(0.75,'#b08850');
+  grd.addColorStop(1,   'rgba(180,130,70,0)');
+  ctx.save();
+  ctx.scale(W / H * 0.65, 1);
+  ctx.beginPath();
+  ctx.arc(cx / (W / H * 0.65), cy, Math.min(W, H) * 0.42, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+  ctx.restore();
+
+  // texture overlay
+  const rng = seededRandom(42);
+  for (let i = 0; i < 220; i++) {
+    const tx = cx + (rng() - 0.5) * W * 0.55;
+    const ty = cy + (rng() - 0.5) * H * 0.7;
+    const r  = 2 + rng() * 6;
+    const hue = 20 + rng() * 30;
+    ctx.beginPath();
+    ctx.arc(tx, ty, r, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue},50%,${30 + rng()*25}%,${0.35 + rng()*0.35})`;
+    ctx.fill();
+  }
+
+  // label
+  ctx.fillStyle = 'rgba(255,255,255,.12)';
+  ctx.font = '13px monospace';
+  ctx.fillText('← 點擊「AI 自動分析」開始', W / 2 - 120, H - 24);
+}
+
+window.addEventListener('resize', drawWSI);
+drawWSI();
+
+// ═══════════════════════════════════════════════
+//  ANALYSIS SIMULATION
+// ═══════════════════════════════════════════════
+const STEPS = [
+  [8,  '讀取 WSI thumbnail…'],
+  [20, '偵測組織區域（Otsu 閾值）…'],
+  [38, '選取 5 塊高密度 ROI…'],
+  [55, 'Cellpose：偵測細胞輪廓…'],
+  [72, 'EfficientNetV2：分類細胞…'],
+  [88, '依信心度自動路由（高信心 → Accepted）…'],
+  [97, '產生 Annotation JSON…'],
+  [100,'完成！'],
+];
+
+function startAnalysis() {
+  if (analysisComplete) { showReviewPage(); return; }
+
+  const btn = document.getElementById('btn-analyze');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  document.getElementById('wsi-status').textContent = '分析中…';
+
+  const overlay = document.getElementById('progress-overlay');
+  overlay.classList.add('show');
+
+  let i = 0;
+  function tick() {
+    if (i >= STEPS.length) {
+      setTimeout(() => {
+        overlay.classList.remove('show');
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        analysisComplete = true;
+        drawROIBoxes();
+        document.getElementById('wsi-status').textContent = '分析完成 — 找到 5 塊 ROI，共 ' +
+          Object.values(MOCK_CELLS).flat().length + ' 顆細胞';
+        btn.innerHTML = '查看結果 →';
+      }, 400);
+      return;
+    }
+    document.getElementById('prog-fill').style.width = STEPS[i][0] + '%';
+    document.getElementById('prog-pct').textContent   = STEPS[i][0] + '%';
+    document.getElementById('prog-step').textContent  = STEPS[i][1];
+    i++;
+    setTimeout(tick, 300 + Math.random() * 250);
+  }
+  tick();
+}
+
+// draw ROI boxes on top of WSI canvas after analysis
+function drawROIBoxes() {
+  const canvas = document.getElementById('wsi-canvas');
+  const ctx    = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  MOCK_ROIS.forEach((roi, idx) => {
+    const rx = roi.x * W, ry = roi.y * H;
+    const rw = roi.w * W, rh = roi.h * H;
+
+    // semi-transparent fill
+    ctx.fillStyle = roi.color.replace(')', ',.10)').replace('rgb','rgba') +
+                    (roi.color.startsWith('#') ? '1a' : '');
+    ctx.fillStyle = hexToRgba(roi.color, 0.12);
+    ctx.fillRect(rx, ry, rw, rh);
+
+    // border
+    ctx.strokeStyle = roi.color;
+    ctx.lineWidth   = 2;
+    ctx.strokeRect(rx, ry, rw, rh);
+
+    // label tag
+    ctx.fillStyle = roi.color;
+    ctx.fillRect(rx, ry, 38, 16);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('ROI-' + idx, rx + 4, ry + 11);
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  PAGE 2 — REVIEW
+// ═══════════════════════════════════════════════
+function showReviewPage() {
+  document.getElementById('page-wsi').style.display    = 'none';
+  document.getElementById('page-review').classList.add('show');
+  renderClassTabs();
+  switchClass('MMZ');
+  renderMinimap(-1);  // draw minimap, no highlight yet
+}
+
+// draw the WSI minimap with ROI boxes; highlightRoi = -1 means none highlighted
+function renderMinimap(highlightRoi) {
+  const canvas = document.getElementById('minimap-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // background
+  ctx.fillStyle = '#0d0e10';
+  ctx.fillRect(0, 0, W, H);
+
+  // tissue blob (same proportions as main WSI)
+  const cx = W * 0.5, cy = H * 0.5;
+  const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.45);
+  grd.addColorStop(0,   '#c4a070');
+  grd.addColorStop(0.5, '#a88050');
+  grd.addColorStop(1,   'rgba(150,110,60,0)');
+  ctx.save();
+  ctx.scale(W / H * 0.65, 1);
+  ctx.beginPath();
+  ctx.arc(cx / (W / H * 0.65), cy, Math.min(W, H) * 0.45, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+  ctx.restore();
+
+  // ROI boxes
+  MOCK_ROIS.forEach((roi, idx) => {
+    const rx = roi.x * W, ry = roi.y * H;
+    const rw = roi.w * W, rh = roi.h * H;
+    const isHL = idx === highlightRoi;
+
+    ctx.fillStyle   = hexToRgba(roi.color, isHL ? 0.35 : 0.12);
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.strokeStyle = roi.color;
+    ctx.lineWidth   = isHL ? 2.5 : 1.5;
+    ctx.strokeRect(rx, ry, rw, rh);
+
+    // bright dot when highlighted
+    if (isHL) {
+      ctx.fillStyle = roi.color;
+      ctx.fillRect(rx, ry, 22, 12);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.fillText('ROI' + idx, rx + 2, ry + 9);
+    }
+  });
+}
+
+function backToWSI() {
+  document.getElementById('page-wsi').style.display    = 'flex';
+  document.getElementById('page-review').classList.remove('show');
+}
+
+// ── Class Tabs ──
+function renderClassTabs() {
+  const container = document.getElementById('class-tabs');
+  container.innerHTML = '';
+  Object.entries(CLASS_INFO).forEach(([cls, info]) => {
+    const tab = document.createElement('button');
+    tab.className = 'class-tab' + (cls === currentClass ? ' active' : '');
+    tab.id = 'ctab-' + cls;
+    const cells  = MOCK_CELLS[cls];
+    const counts = countByStatus(cells);
+    const total  = cells.length;
+    tab.innerHTML = `
+      ${info.alert ? '<span class="alert-dot"></span>' : ''}
+      ${info.label} (${total})`;
+    tab.onclick = () => switchClass(cls);
+    container.appendChild(tab);
+  });
+}
+
+function switchClass(cls) {
+  currentClass  = cls;
+  currentStatus = 'uncertain';
+  currentPage   = 1;
+  selectedIdx   = null;
+  document.querySelectorAll('.class-tab').forEach(t => t.classList.remove('active'));
+  const ct = document.getElementById('ctab-' + cls);
+  if (ct) { ct.classList.add('active'); ct.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }
+  renderStatusTabs();
+  renderGrid();
+  renderDetailEmpty();
+}
+
+// ── Status Tabs ──
+function countByStatus(cells) {
+  const c = { pending: 0, uncertain: 0, 'in-review': 0, accepted: 0, rejected: 0 };
+  cells.forEach(cell => { c[cell.status] = (c[cell.status] || 0) + 1; });
+  return c;
+}
+
+function renderStatusTabs() {
+  const cells  = MOCK_CELLS[currentClass];
+  const counts = countByStatus(cells);
+  const tabs = [
+    { key: 'pending',   label: 'Pending',   extraCls: '' },
+    { key: 'uncertain', label: 'Uncertain', extraCls: 'st-uncertain' },
+    { key: 'in-review', label: 'In Review', extraCls: '' },
+    { key: 'accepted',  label: 'Accepted',  extraCls: 'st-accepted' },
+    { key: 'rejected',  label: 'Rejected',  extraCls: 'st-rejected' },
+  ];
+  const container = document.getElementById('status-tabs');
+  container.innerHTML = '';
+  tabs.forEach(({ key, label, extraCls }) => {
+    const btn = document.createElement('button');
+    btn.className = 'status-tab ' + extraCls + (key === currentStatus ? ' active' : '');
+    btn.innerHTML = `${label} <span class="count">${counts[key] || 0}</span>`;
+    btn.onclick = () => switchStatus(key);
+    container.appendChild(btn);
+  });
+}
+
+function switchStatus(key) {
+  currentStatus = key;
+  currentPage   = 1;
+  selectedIdx   = null;
+  renderStatusTabs();
+  renderGrid();
+  renderDetailEmpty();
+}
+
+// ── Cell Grid ──
+function getFilteredCells() {
+  return MOCK_CELLS[currentClass].filter(c => c.status === currentStatus);
+}
+
+function renderGrid() {
+  const cells    = getFilteredCells();
+  const total    = cells.length;
+  const pages    = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage    = Math.min(currentPage, pages);
+  const start    = (currentPage - 1) * PAGE_SIZE;
+  const pageCells = cells.slice(start, start + PAGE_SIZE);
+
+  const grid = document.getElementById('cell-grid');
+  grid.innerHTML = '';
+
+  if (pageCells.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-grid';
+    empty.style.gridColumn = '1 / -1';
+    empty.innerHTML = `<div class="icon">🔬</div><p>此狀態下無細胞</p>`;
+    grid.appendChild(empty);
+    renderPagination(0, 1);
+    return;
+  }
+
+  pageCells.forEach((cell, i) => {
+    const globalIdx = start + i;
+    const thumb = document.createElement('div');
+    thumb.className = 'cell-thumb' + (selectedIdx === globalIdx ? ' selected' : '');
+    thumb.dataset.idx = globalIdx;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 80; canvas.height = 80;
+    drawCellCrop(canvas, cell);
+    thumb.appendChild(canvas);
+
+    // confidence badge
+    const badge = document.createElement('div');
+    badge.className = 'conf-badge';
+    badge.textContent = (cell.conf * 100).toFixed(0) + '%';
+    badge.style.background = confColor(cell.conf) + 'cc';
+    badge.style.color = '#fff';
+    thumb.appendChild(badge);
+
+    thumb.addEventListener('click', () => selectCell(globalIdx));
+    grid.appendChild(thumb);
+  });
+
+  renderPagination(total, pages);
+
+  // auto-select first cell if none
+  if (selectedIdx === null && pageCells.length > 0) selectCell(start);
+}
+
+function renderPagination(total, pages) {
+  const pg = document.getElementById('pagination');
+  pg.innerHTML = '';
+  if (pages <= 1) return;
+  for (let p = 1; p <= pages; p++) {
+    const btn = document.createElement('button');
+    btn.className = 'pg-btn' + (p === currentPage ? ' active' : '');
+    btn.textContent = p;
+    btn.onclick = () => { currentPage = p; selectedIdx = null; renderGrid(); renderDetailEmpty(); };
+    pg.appendChild(btn);
+  }
+}
+
+// ── Select Cell ──
+function selectCell(globalIdx) {
+  closeRejectMenu();
+  selectedIdx = globalIdx;
+  const cells = getFilteredCells();
+  const cell  = cells[globalIdx];
+  if (!cell) return;
+
+  document.querySelectorAll('.cell-thumb').forEach(el => {
+    el.classList.toggle('selected', parseInt(el.dataset.idx) === globalIdx);
+  });
+
+  renderDetailPanel(cell);
+  renderMinimap(cell.roiId);   // highlight this cell's ROI on minimap
+}
+
+// ── Detail Panel ──
+function renderDetailEmpty() {
+  closeRejectMenu();
+  document.getElementById('sug-value').textContent      = '—';
+  document.getElementById('conf-val-text').textContent  = '—';
+  document.getElementById('conf-bar').style.width       = '0';
+  document.getElementById('top3-dist').innerHTML        = '';
+  const ctx2 = document.getElementById('detail-ctx-canvas').getContext('2d');
+  ctx2.fillStyle = '#0d0e10';
+  ctx2.fillRect(0, 0, 320, 240);
+  document.getElementById('detail-cell-box').style.display = 'none';
+  renderMinimap(-1);
+}
+
+function renderDetailPanel(cell) {
+  const info = CLASS_INFO[cell.cls];
+  document.getElementById('sug-value').textContent = info.label;
+
+  const pct = cell.conf * 100;
+  document.getElementById('conf-bar').style.width      = pct + '%';
+  document.getElementById('conf-bar').style.background = confColor(cell.conf);
+  document.getElementById('conf-val-text').textContent = pct.toFixed(1) + '%';
+  document.getElementById('conf-val-text').style.color = confColor(cell.conf);
+
+  // top-3
+  const sorted = Object.entries(cell.top).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const top3 = document.getElementById('top3-dist');
+  top3.innerHTML = '';
+  sorted.forEach(([k, v]) => {
+    const row = document.createElement('div');
+    row.className = 'top3-row';
+    row.innerHTML = `
+      <span class="top3-cls">${k}</span>
+      <div class="top3-bar-bg"><div class="top3-bar-fill" style="width:${v*100}%;background:${CLASS_INFO[k]?.color||'#666'};"></div></div>
+      <span class="top3-pct">${(v*100).toFixed(0)}%</span>`;
+    top3.appendChild(row);
+  });
+
+  // context canvas
+  const canvas = document.getElementById('detail-ctx-canvas');
+  drawContextCrop(canvas, cell);
+
+  // red box overlay (cell position in context)
+  const box = document.getElementById('detail-cell-box');
+  box.style.display = 'block';
+  box.style.left    = '112px';
+  box.style.top     = '80px';
+  box.style.width   = '96px';
+  box.style.height  = '80px';
+}
+
+// ── setStatus ──
+function setStatus(newStatus) {
+  const cells = getFilteredCells();
+  const cell  = cells[selectedIdx];
+  if (!cell) return;
+  closeRejectMenu();
+  cell.status = newStatus;
+  renderStatusTabs();
+  renderClassTabs();
+  advanceToNext();
+}
+
+function advanceToNext() {
+  const remaining = getFilteredCells();
+  if (remaining.length === 0) {
+    selectedIdx = null;
+    renderGrid();
+    renderDetailEmpty();
+    renderMinimap(-1);
+  } else {
+    const nextIdx = Math.min(selectedIdx ?? 0, remaining.length - 1);
+    selectedIdx = null;
+    renderGrid();
+    selectCell(nextIdx);
+  }
+}
+
+// ── Reject menu ──
+function toggleRejectMenu() {
+  const cells = getFilteredCells();
+  const cell  = cells[selectedIdx];
+  if (!cell) return;
+  const menu = document.getElementById('reject-menu');
+  if (menu.classList.contains('show')) { closeRejectMenu(); return; }
+
+  // populate top-3 alternatives (exclude current class)
+  const alts = Object.entries(cell.top)
+    .filter(([k]) => k !== cell.cls)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+
+  const container = document.getElementById('rm-options');
+  container.innerHTML = '';
+  alts.forEach(([cls, prob]) => {
+    const info = CLASS_INFO[cls];
+    const btn  = document.createElement('button');
+    btn.className = 'rm-option';
+    btn.innerHTML = `
+      <span class="rm-cls-dot" style="background:${info.color};"></span>
+      <span class="rm-cls-name">${info.label}</span>
+      <span class="rm-pct">${(prob * 100).toFixed(0)}%</span>`;
+    btn.onclick = () => reclassifyTo(cls);
+    container.appendChild(btn);
+  });
+
+  menu.classList.add('show');
+
+  // click outside to close
+  setTimeout(() => document.addEventListener('click', outsideRejectClick, { once: true }), 0);
+}
+
+function outsideRejectClick(e) {
+  const menu = document.getElementById('reject-menu');
+  const btn  = document.getElementById('btn-reject');
+  if (!menu.contains(e.target) && e.target !== btn) closeRejectMenu();
+}
+
+function closeRejectMenu() {
+  document.getElementById('reject-menu').classList.remove('show');
+}
+
+function confirmReject() {
+  setStatus('rejected');
+}
+
+// move cell to another class → in-review
+function reclassifyTo(targetCls) {
+  const cells = getFilteredCells();
+  const cell  = cells[selectedIdx];
+  if (!cell) return;
+  closeRejectMenu();
+
+  // mark as rejected in current class
+  cell.status = 'rejected';
+
+  // clone into target class with in-review status
+  const newCell = Object.assign({}, cell, {
+    cls: targetCls,
+    conf: cell.top[targetCls] || 0.4,
+    status: 'in-review',
+    seed: cell.seed + 5000,
+    roiId: cell.roiId,
+  });
+  MOCK_CELLS[targetCls].unshift(newCell);   // prepend so it appears first
+
+  renderStatusTabs();
+  renderClassTabs();
+
+  // flash toast
+  const info = CLASS_INFO[targetCls];
+  showToast(`已移至 ${info.label} In Review`);
+
+  advanceToNext();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ═══════════════════════════════════════════════
+//  CANVAS DRAWING HELPERS
+// ═══════════════════════════════════════════════
+
+function drawCellCrop(canvas, cell) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const rng = seededRandom(cell.seed * 137 + 31);
+
+  // background (tissue)
+  const hue = 28 + rng() * 12;
+  ctx.fillStyle = `hsl(${hue},35%,${72 + rng()*10}%)`;
+  ctx.fillRect(0, 0, W, H);
+
+  // background cells (smaller, dim)
+  for (let i = 0; i < 4; i++) {
+    const bx = rng() * W, by = rng() * H, br = 5 + rng() * 7;
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2);
+    ctx.fillStyle = `hsla(${270 + rng()*60},45%,50%,0.45)`; ctx.fill();
+  }
+
+  // main cell — shape depends on class
+  const info = CLASS_INFO[cell.cls];
+  const cx = W * 0.5, cy = H * 0.5;
+  const cellR = 16 + rng() * 6;
+
+  // cell body
+  ctx.beginPath(); ctx.arc(cx, cy, cellR, 0, Math.PI*2);
+  ctx.fillStyle = hexToRgba(info.color, 0.22); ctx.fill();
+  ctx.strokeStyle = hexToRgba(info.color, 0.7); ctx.lineWidth = 1.5; ctx.stroke();
+
+  // nucleus
+  const nucColor = nucleusColor(cell.cls);
+  drawNucleus(ctx, cx, cy, cellR, cell.cls, rng, nucColor);
+
+  // granules for granulocytes
+  if (['NEU','EOS','BAS'].includes(cell.cls)) {
+    for (let g = 0; g < 8; g++) {
+      const angle = rng() * Math.PI * 2, dist = rng() * cellR * 0.7;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, 1.5, 0, Math.PI*2);
+      ctx.fillStyle = hexToRgba(info.color, 0.6); ctx.fill();
+    }
+  }
+}
+
+function drawNucleus(ctx, cx, cy, cellR, cls, rng, color) {
+  const nr = cellR * 0.52;
+  ctx.fillStyle = color; ctx.strokeStyle = color.replace('0.8', '1');
+  ctx.lineWidth = 1;
+  if (cls === 'NEU') {
+    // multi-lobed
+    for (let l = 0; l < 3; l++) {
+      const angle = (l / 3) * Math.PI * 2 - Math.PI/2;
+      const lx = cx + Math.cos(angle) * nr * 0.5;
+      const ly = cy + Math.sin(angle) * nr * 0.4;
+      ctx.beginPath(); ctx.arc(lx, ly, nr * 0.42, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+    }
+  } else if (cls === 'MMZ') {
+    // kidney-shaped: two arcs
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, nr * 0.8, nr * 0.5, -Math.PI/6, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,.15)';
+    ctx.beginPath(); ctx.arc(cx + nr*0.2, cy, nr*0.25, 0, Math.PI*2); ctx.fill();
+  } else if (cls === 'MON') {
+    // horseshoe
+    ctx.beginPath(); ctx.arc(cx, cy, nr * 0.7, 0.3, Math.PI - 0.3);
+    ctx.lineWidth = nr * 0.5; ctx.stroke();
+  } else if (cls === 'BLA') {
+    // round, open chromatin
+    ctx.beginPath(); ctx.arc(cx, cy, nr * 0.75, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    for (let n = 0; n < 2; n++) {
+      const a = rng()*Math.PI*2, d = nr*0.3;
+      ctx.beginPath(); ctx.arc(cx+Math.cos(a)*d, cy+Math.sin(a)*d, nr*0.18, 0, Math.PI*2); ctx.fill();
+    }
+  } else {
+    ctx.beginPath(); ctx.arc(cx + rng()*4-2, cy + rng()*4-2, nr * (0.6 + rng()*0.25), 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+  }
+}
+
+function drawContextCrop(canvas, cell) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const rng = seededRandom(cell.seed * 57 + 99);
+
+  // background
+  const hue = 28 + rng() * 12;
+  ctx.fillStyle = `hsl(${hue},30%,78%)`;
+  ctx.fillRect(0, 0, W, H);
+
+  // surrounding cells
+  for (let i = 0; i < 14; i++) {
+    const bx = rng() * W, by = rng() * H, br = 8 + rng() * 12;
+    const ch = 240 + rng() * 80;
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2);
+    ctx.fillStyle = `hsla(${ch},40%,45%,0.55)`; ctx.fill();
+    // nucleus
+    ctx.beginPath(); ctx.arc(bx + rng()*4-2, by + rng()*4-2, br*0.5, 0, Math.PI*2);
+    ctx.fillStyle = `hsla(${ch},50%,25%,0.6)`; ctx.fill();
+  }
+
+  // main cell in center (larger, prominent)
+  const info = CLASS_INFO[cell.cls];
+  const cx = W / 2, cy = H / 2;
+  const cellR = 22 + rng() * 6;
+  ctx.beginPath(); ctx.arc(cx, cy, cellR, 0, Math.PI*2);
+  ctx.fillStyle = hexToRgba(info.color, 0.25); ctx.fill();
+  ctx.strokeStyle = hexToRgba(info.color, 0.8); ctx.lineWidth = 2; ctx.stroke();
+  drawNucleus(ctx, cx, cy, cellR, cell.cls, seededRandom(cell.seed + 7), nucleusColor(cell.cls));
+}
+
+function nucleusColor(cls) {
+  const map = {
+    NEU:'rgba(80,50,160,0.75)', LYM:'rgba(60,80,180,0.8)',
+    MON:'rgba(100,60,140,0.7)', EOS:'rgba(70,50,150,0.75)',
+    BAS:'rgba(40,20,100,0.85)', EBL:'rgba(140,30,80,0.75)',
+    MMZ:'rgba(90,55,155,0.75)', BLA:'rgba(50,40,130,0.8)',
+  };
+  return map[cls] || 'rgba(80,50,150,0.7)';
+}
+
+function confColor(conf) {
+  if (conf >= 0.85) return '#66bb6a';
+  if (conf >= 0.65) return '#ffa726';
+  return '#ef5350';
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function seededRandom(seed) {
+  let s = seed | 0;
+  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+}
+</script>
+</body>
+</html>

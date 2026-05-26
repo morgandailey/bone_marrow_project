@@ -1,0 +1,34 @@
+# 骨髓細胞分類專案環境
+# conda 環境名稱：project1
+# Python 3.10 / CUDA 12.4
+#
+# 建立環境方式：
+#   conda create -n project1 python=3.10
+#   conda install pytorch==2.6.0 torchvision==0.21.0 pytorch-cuda=12.4 -c pytorch -c nvidia
+#   pip install -r requirements.txt
+
+# 模型
+timm==1.0.26
+
+# WSI 讀取
+openslide-python==1.4.3
+openslide-bin==4.0.0.13        # pip 版 openslide binary，免另裝系統套件
+
+# 細胞偵測
+cellpose==4.1.1
+
+# 影像處理
+Pillow==12.1.1
+scikit-image==0.25.2
+opencv-python==4.13.0.92
+numpy==2.2.6
+
+# 資料處理
+pandas==2.3.3
+tqdm==4.67.3
+
+# 視覺化
+matplotlib==3.10.8
+
+# 分類 / 評估
+scikit-learn==1.7.2

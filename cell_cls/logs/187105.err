@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/work/u4001296/project1/cell_cls/train_stage1.py", line 166, in <module>
+    main()
+  File "/work/u4001296/project1/cell_cls/train_stage1.py", line 117, in main
+    model = build_model(cfg['num_classes']).to(device)
+  File "/work/u4001296/project1/cell_cls/train_stage1.py", line 48, in build_model
+    model = timm.create_model('efficientnetv2_m', pretrained=True, num_classes=num_classes)
+  File "/home/u4001296/.conda/envs/project1/lib/python3.10/site-packages/timm/models/_factory.py", line 138, in create_model
+    model = create_fn(
+  File "/home/u4001296/.conda/envs/project1/lib/python3.10/site-packages/timm/models/efficientnet.py", line 2413, in efficientnetv2_m
+    model = _gen_efficientnetv2_m('efficientnetv2_m', pretrained=pretrained, **kwargs)
+  File "/home/u4001296/.conda/envs/project1/lib/python3.10/site-packages/timm/models/efficientnet.py", line 971, in _gen_efficientnetv2_m
+    model = _create_effnet(variant, pretrained, **model_kwargs)
+  File "/home/u4001296/.conda/envs/project1/lib/python3.10/site-packages/timm/models/efficientnet.py", line 465, in _create_effnet
+    model = build_model_with_cfg(
+  File "/home/u4001296/.conda/envs/project1/lib/python3.10/site-packages/timm/models/_builder.py", line 457, in build_model_with_cfg
+    load_pretrained(
+  File "/home/u4001296/.conda/envs/project1/lib/python3.10/site-packages/timm/models/_builder.py", line 236, in load_pretrained
+    raise RuntimeError(f"No pretrained weights exist for {model_name}. Use `pretrained=False` for random init.")
+RuntimeError: No pretrained weights exist for efficientnetv2_m. Use `pretrained=False` for random init.
