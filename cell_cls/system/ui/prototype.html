@@ -104,6 +104,7 @@ button { cursor: pointer; font-family: inherit; }
 .class-tab:hover { color: #ccc; }
 .class-tab.active { color: #90caf9; border-bottom-color: #1976d2; }
 .class-tab .alert-dot { width: 6px; height: 6px; background: #ef5350; border-radius: 50%; }
+.class-tab .pct { font-size: 10px; font-weight: 400; color: #555; margin-left: 2px; }
 
 /* right side of topbar */
 .rv-topbar-right {
@@ -678,9 +679,11 @@ function renderClassTabs() {
     const cells  = MOCK_CELLS[cls];
     const counts = countByStatus(cells);
     const total  = cells.length;
+    const allTotal = Object.values(MOCK_CELLS).flat().length;
+    const pct = allTotal > 0 ? (total / allTotal * 100).toFixed(1) : '0.0';
     tab.innerHTML = `
       ${info.alert ? '<span class="alert-dot"></span>' : ''}
-      ${info.label} (${total})`;
+      ${info.label} (${total}) <span class="pct">${pct}%</span>`;
     tab.onclick = () => switchClass(cls);
     container.appendChild(tab);
   });
